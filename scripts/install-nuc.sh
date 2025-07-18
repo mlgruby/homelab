@@ -175,9 +175,36 @@ nixos-install --no-root-passwd
 
 # 8. Finalize
 # The umount is now handled by the trap at the beginning of the script.
-# This section is intentionally left blank.
+
+# Get the current IP address
+CURRENT_IP=$(ip route get 1.1.1.1 | grep -oP 'src \K\S+' 2>/dev/null || echo "unknown")
 
 echo "------------------------------------------------------------------"
 echo ">>> SUCCESS: Installation complete for ${HOSTNAME}."
-echo ">>> Please remove the installation media and reboot the system."
-echo "------------------------------------------------------------------" 
+echo ">>> "
+echo ">>> Current system information:"
+echo ">>> Hostname: ${HOSTNAME}"
+echo ">>> IP Address: ${CURRENT_IP}"
+echo ">>> "
+echo ">>> Next steps:"
+echo ">>> 1. Remove the USB installation media"
+echo ">>> 2. Reboot the system"
+echo ">>> 3. The system will boot into NixOS and be accessible via SSH"
+echo ">>> "
+echo ">>> SSH connection command:"
+echo ">>> ssh -i ~/.ssh/nuc_homelab_id_ed25519 satya@${CURRENT_IP}"
+echo ">>> "
+echo ">>> Note: If the IP address changes after reboot (DHCP), you can find it by:"
+echo ">>> - Checking your router's admin panel for connected devices"
+echo ">>> - Using: nmap -sn 192.168.1.0/24 (adjust subnet as needed)"
+echo ">>> - Looking for hostname '${HOSTNAME}' in your network"
+echo "------------------------------------------------------------------"
+
+read -r -p "Would you like to reboot now? (y/n): " REBOOT_CHOICE
+if [[ "$REBOOT_CHOICE" =~ ^[Yy]$ ]]; then
+    echo ">>> Rebooting in 5 seconds... Remove the USB now!"
+    sleep 5
+    reboot
+else
+    echo ">>> Remember to remove the USB installation media before rebooting manually."
+fi 
