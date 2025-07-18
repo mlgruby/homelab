@@ -113,10 +113,10 @@ echo ">>> Formatting boot partition: ${OS_P1}"
 mkfs.fat -F 32 -n boot "${OS_P1}"
 
 echo ">>> Formatting root partition: ${OS_P2}"
-mkfs.ext4 -L root "${OS_P2}"
+mkfs.ext4 -F -L root "${OS_P2}"
 
 echo ">>> Formatting data partition: ${FAST_P1}"
-mkfs.ext4 -L data "${FAST_P1}"
+mkfs.ext4 -F -L data "${FAST_P1}"
 
 # 5. Mount the filesystems
 echo ">>> Mounting filesystems"
