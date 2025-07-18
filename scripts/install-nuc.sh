@@ -325,10 +325,8 @@ fi
 # Copy our configuration files to the installed system
 echo ">>> Copying configuration files to installed system"
 mkdir -p "/mnt/etc/nixos/homelab/common"
-mkdir -p "/mnt/etc/nixos/homelab/hosts/${HOSTNAME}"
 
 cp "${REPO_ROOT}/common/common.nix" "/mnt/etc/nixos/homelab/common/"
-cp "${REPO_ROOT}/hosts/${HOSTNAME}/configuration.nix" "/mnt/etc/nixos/homelab/hosts/${HOSTNAME}/"
 
 # Replace the generated configuration with one that points to our copied files
 rm /mnt/etc/nixos/configuration.nix
@@ -341,9 +339,17 @@ cat > /mnt/etc/nixos/configuration.nix <<EOF
       # This pulls in the hardware-specific configuration
       ./hardware-configuration.nix
 
-      # This points to the host-specific configuration
-      ./homelab/hosts/${HOSTNAME}/configuration.nix
+      # This points to the common configuration (safe for fresh installs)
+      ./homelab/common/common.nix
+      
+      # Basic hostname setting
     ];
+    
+  # Set hostname for this installation
+  networking.hostName = "${HOSTNAME}";
+  
+  # Basic system version
+  system.stateVersion = "24.05";
 }
 EOF
 
@@ -353,14 +359,6 @@ if [[ -f /mnt/etc/nixos/configuration.nix ]]; then
     echo ">>> ✓ Main configuration.nix created successfully"
 else
     echo ">>> ✗ ERROR: Failed to create configuration.nix"
-    exit 1
-fi
-
-# Check if our copied configurations exist in the installed system
-if [[ -f "/mnt/etc/nixos/homelab/hosts/${HOSTNAME}/configuration.nix" ]]; then
-    echo ">>> ✓ Host-specific configuration copied: /etc/nixos/homelab/hosts/${HOSTNAME}/configuration.nix"
-else
-    echo ">>> ✗ ERROR: Host-specific configuration not copied properly"
     exit 1
 fi
 
