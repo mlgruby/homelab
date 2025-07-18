@@ -173,7 +173,31 @@ EOF
 echo ">>> Installing NixOS"
 nixos-install --no-root-passwd
 
-# 8. Finalize
+# 8. Verify SSH configuration
+echo ">>> Verifying SSH configuration in installed system"
+if nixos-enter --root /mnt -- systemctl is-enabled sshd &>/dev/null; then
+    echo ">>> ✓ SSH service is enabled"
+else
+    echo ">>> ⚠ WARNING: SSH service may not be properly enabled"
+fi
+
+# Check if user exists and has authorized keys
+if nixos-enter --root /mnt -- id satya &>/dev/null; then
+    echo ">>> ✓ User 'satya' exists in installed system"
+    
+    # Check if authorized_keys file exists and has content
+    if nixos-enter --root /mnt -- test -s /home/satya/.ssh/authorized_keys; then
+        echo ">>> ✓ SSH authorized keys are configured for user 'satya'"
+        KEY_COUNT=$(nixos-enter --root /mnt -- wc -l < /home/satya/.ssh/authorized_keys)
+        echo ">>> ✓ Found ${KEY_COUNT} authorized key(s)"
+    else
+        echo ">>> ⚠ WARNING: No SSH authorized keys found for user 'satya'"
+    fi
+else
+    echo ">>> ⚠ WARNING: User 'satya' not found in installed system"
+fi
+
+# 9. Finalize
 # The umount is now handled by the trap at the beginning of the script.
 
 # Get the current IP address
