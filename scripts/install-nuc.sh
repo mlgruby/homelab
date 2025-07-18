@@ -165,7 +165,7 @@ EOF
 
 # 7. Install NixOS
 echo ">>> Installing NixOS"
-nixos-install --no-root-passwd --flake "${REPO_ROOT}#${HOSTNAME}"
+nixos-install --no-root-passwd
 
 # 8. Finalize
 # The umount is now handled by the trap at the beginning of the script.
