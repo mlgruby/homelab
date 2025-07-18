@@ -6,6 +6,11 @@ set -euo pipefail
 #
 # Example usage: ./scripts/install-nuc.sh -h nuc1
 
+# --- Cleanup Trap ---
+# This ensures that we always attempt to unmount everything on script exit,
+# regardless of success or failure. This makes the script re-runnable.
+trap 'echo ">>> Script finished or failed. Unmounting filesystems..."; umount -R /mnt || true' EXIT
+
 # --- Argument Parsing ---
 HOSTNAME=""
 
@@ -57,13 +62,17 @@ fi
 
 echo ">>> Starting NUC installation for hostname: ${HOSTNAME}"
 
-# 0. Deactivate any existing LVM, RAID, or ZFS to release device locks
-echo ">>> Deactivating LVM, stopping RAID, and clearing ZFS labels..."
+# 0. Forcefully deactivate any LVM, RAID, or ZFS to release device locks
+echo ">>> Forcefully removing device-mapper mappings and deactivating LVM..."
+(dmsetup remove_all --force) 2>/dev/null || true
 (vgchange -an) 2>/dev/null || true
+
+echo ">>> Stopping RAID and clearing ZFS labels..."
 (mdadm --stop --scan) 2>/dev/null || true
 # The following command is critical for disks previously used with ZFS (e.g., Proxmox)
 (zpool labelclear -f "${OS_DEVICE}") 2>/dev/null || true
 (zpool labelclear -f "${FAST_DEVICE}") 2>/dev/null || true
+sleep 2 # Give the system a moment to release locks
 
 # 1. Ensure devices are unmounted and clean
 echo ">>> Wiping existing signatures from disks..."
@@ -156,10 +165,10 @@ EOF
 
 # 7. Install NixOS
 echo ">>> Installing NixOS"
-nixos-install --no-root-passwd
+nixos-install --no-root-passwd --flake "${REPO_ROOT}#${HOSTNAME}"
 
 # 8. Finalize
-echo ">>> Unmounting filesystems"
-umount -R /mnt
+# The umount is now handled by the trap at the beginning of the script.
+# This section is intentionally left blank.
 
 echo ">>> Installation complete for ${HOSTNAME}. Please remove the installation media and reboot." 
