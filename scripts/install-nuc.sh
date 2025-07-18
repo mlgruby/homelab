@@ -71,25 +71,36 @@ sgdisk -n 1:0:0 -t 1:8300 -c 1:"data" \
 echo ">>> Formatting partitions"
 
 # Force kernel to re-read partition tables to prevent errors
+echo ">>> Informing kernel of new partitions..."
 partprobe "${OS_DEVICE}"
 partprobe "${FAST_DEVICE}"
-sleep 2 
+sleep 3 
 
 # Determine partition naming convention (e.g., sda1 vs nvme0n1p1)
-OS_P1="${OS_DEVICE}1"
-OS_P2="${OS_DEVICE}2"
-if [[ "${OS_DEVICE}" == *"nvme"* ]] || [[ "${OS_DEVICE}" == *"mmcblk"* ]]; then
+OS_P1=""
+OS_P2=""
+if [[ "${OS_DEVICE}" =~ "nvme" || "${OS_DEVICE}" =~ "mmcblk" ]]; then
     OS_P1="${OS_DEVICE}p1"
     OS_P2="${OS_DEVICE}p2"
+else
+    OS_P1="${OS_DEVICE}1"
+    OS_P2="${OS_DEVICE}2"
 fi
 
-FAST_P1="${FAST_DEVICE}1"
-if [[ "${FAST_DEVICE}" == *"nvme"* ]] || [[ "${FAST_DEVICE}" == *"mmcblk"* ]]; then
+FAST_P1=""
+if [[ "${FAST_DEVICE}" =~ "nvme" || "${FAST_DEVICE}" =~ "mmcblk" ]]; then
     FAST_P1="${FAST_DEVICE}p1"
+else
+    FAST_P1="${FAST_DEVICE}1"
 fi
 
+echo ">>> Formatting boot partition: ${OS_P1}"
 mkfs.fat -F 32 -n boot "${OS_P1}"
+
+echo ">>> Formatting root partition: ${OS_P2}"
 mkfs.ext4 -L root "${OS_P2}"
+
+echo ">>> Formatting data partition: ${FAST_P1}"
 mkfs.ext4 -L data "${FAST_P1}"
 
 # 4. Mount the filesystems
