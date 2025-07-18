@@ -1,6 +1,37 @@
-# Ignore build outputs from performing a nix-build or `nix build` command
-result
-result-*
+# Binaries for programs and plugins
+*.so
+*.so.*
+*.a
+*.dll
+*.exe
+*.suo
+*.com
+*.i*86
+*.x86_64
+*.wasm
+*.d
+*.o
+
+# Log files
+*.log
+*.log.*
+/logs/
+
+# Node
+/node_modules
+npm-debug.log
+yarn-error.log
+
+# Python
+/dist/
+*.pyc
+__pycache__
 
 # Ignore automatically generated direnv output
 .direnv
+
+# Secrets
+/secrets/*
+!/secrets/.gitkeep
+nuc_homelab_id_ed25519
+nuc_homelab_id_ed25519.pub

@@ -17,7 +17,6 @@
   users.users.satyasheel = {
     isNormalUser = true;
     extraGroups = [ "wheel" ]; # Enable 'sudo'
-    # TODO: Replace with your actual SSH public key
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEomtxD4A137gFGJG0cMXMidR5wQymAiay5vUS89qkX8 nuc-homelab-key"
     ];

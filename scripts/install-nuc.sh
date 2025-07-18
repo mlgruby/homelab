@@ -35,6 +35,12 @@ fi
 REPO_ROOT=$(pwd)
 echo ">>> Using repository root: ${REPO_ROOT}"
 
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo "!!! IMPORTANT: Have you added your SSH public key to"
+echo "!!! ${REPO_ROOT}/common/common.nix ?"
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+read -r -p "Press Enter to continue, or Ctrl-C to cancel and edit the file."
+
 # --- Interactive Device Selection ---
 echo ">>> Available block devices:"
 lsblk -dno NAME,SIZE,MODEL
@@ -171,4 +177,7 @@ nixos-install --no-root-passwd
 # The umount is now handled by the trap at the beginning of the script.
 # This section is intentionally left blank.
 
-echo ">>> Installation complete for ${HOSTNAME}. Please remove the installation media and reboot." 
+echo "------------------------------------------------------------------"
+echo ">>> SUCCESS: Installation complete for ${HOSTNAME}."
+echo ">>> Please remove the installation media and reboot the system."
+echo "------------------------------------------------------------------" 
