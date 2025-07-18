@@ -23,6 +23,13 @@ if [ -z "$HOSTNAME" ]; then
     exit 1
 fi
 
+# --- Get Repo Root ---
+# We assume this script is being run from the root of the homelab git repo
+# E.g., /path/to/homelab/scripts/install-nuc.sh
+# So the repo root is the current working directory.
+REPO_ROOT=$(pwd)
+echo ">>> Using repository root: ${REPO_ROOT}"
+
 # --- Interactive Device Selection ---
 echo ">>> Available block devices:"
 lsblk -dno NAME,SIZE,MODEL
@@ -142,8 +149,7 @@ cat > /mnt/etc/nixos/configuration.nix <<EOF
       ./hardware-configuration.nix
 
       # This points to the host-specific configuration in our flake
-      # Assumes the flake repository is available at /tmp/homelab
-      /tmp/homelab/hosts/${HOSTNAME}/configuration.nix
+      ${REPO_ROOT}/hosts/${HOSTNAME}/configuration.nix
     ];
 }
 EOF
