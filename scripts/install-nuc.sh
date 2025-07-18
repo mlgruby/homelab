@@ -50,6 +50,13 @@ fi
 
 echo ">>> Starting NUC installation for hostname: ${HOSTNAME}"
 
+# 0. Ensure devices are unmounted and clean
+echo ">>> Wiping existing signatures from disks..."
+umount -R "${OS_DEVICE}" || true
+umount -R "${FAST_DEVICE}" || true
+wipefs --all "${OS_DEVICE}"
+wipefs --all "${FAST_DEVICE}"
+
 # 1. Partition the OS drive
 echo ">>> Partitioning OS drive: ${OS_DEVICE}"
 # Wipe the partition table
