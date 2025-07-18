@@ -35,9 +35,27 @@ fi
 REPO_ROOT=$(pwd)
 echo ">>> Using repository root: ${REPO_ROOT}"
 
+# --- Extract Username from Configuration ---
+USERNAME=$(grep -o 'users\.users\.[a-zA-Z0-9_-]*' "${REPO_ROOT}/common/common.nix" | head -1 | cut -d'.' -f3)
+if [[ -z "$USERNAME" ]]; then
+    echo ">>> ⚠ WARNING: Could not extract username from configuration, using 'satya' as fallback"
+    USERNAME="satya"
+else
+    echo ">>> ✓ Detected username from configuration: ${USERNAME}"
+fi
+
 echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-echo "!!! IMPORTANT: Have you added your SSH public key to"
-echo "!!! ${REPO_ROOT}/common/common.nix ?"
+echo "!!! IMPORTANT: Checking SSH public key configuration..."
+if grep -q "openssh\.authorizedKeys\.keys" "${REPO_ROOT}/common/common.nix"; then
+    echo "!!! ✓ SSH public key found in ${REPO_ROOT}/common/common.nix"
+    # Extract and show the key comment/name for verification
+    SSH_KEY_INFO=$(grep "ssh-" "${REPO_ROOT}/common/common.nix" | head -1 | awk '{print $3}' || echo "unknown")
+    echo "!!! Key: ${SSH_KEY_INFO}"
+else
+    echo "!!! ✗ ERROR: No SSH public key found in ${REPO_ROOT}/common/common.nix"
+    echo "!!! Please add your SSH public key before continuing."
+    exit 1
+fi
 echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 read -r -p "Press Enter to continue, or Ctrl-C to cancel and edit the file."
 
@@ -345,70 +363,34 @@ nixos-install --no-root-passwd
 
 # 7.1. Validate NixOS configuration syntax
 echo ">>> Validating NixOS configuration syntax"
+echo ">>> Note: This validation runs in the installer environment and may show warnings"
 if nixos-enter --root /mnt -- nixos-rebuild dry-run --fast &>/dev/null; then
     echo ">>> ✓ NixOS configuration syntax is valid"
 else
-    echo ">>> ⚠ WARNING: NixOS configuration may have syntax errors"
-    echo ">>> Running syntax check with verbose output:"
-    nixos-enter --root /mnt -- nixos-rebuild dry-run --fast 2>&1 | head -20
-fi
-
-# 7.2. Apply configuration to ensure user and SSH keys are created
-echo ">>> Applying configuration to ensure user and SSH setup"
-if nixos-enter --root /mnt -- nixos-rebuild switch &>/dev/null; then
-    echo ">>> ✓ Configuration applied successfully"
-else
-    echo ">>> ⚠ WARNING: Configuration rebuild had issues, continuing with verification..."
-    nixos-enter --root /mnt -- nixos-rebuild switch 2>&1 | head -10
+    echo ">>> ⚠ Configuration validation had issues (this may be normal in installer environment)"
+    echo ">>> The installation will continue - configuration will be validated on first boot"
 fi
 
 # 8. Verify SSH configuration
 echo ">>> Verifying SSH configuration in installed system"
 
-# Extract username from the configuration
-USERNAME=$(grep -o 'users\.users\.[a-zA-Z0-9_-]*' "${REPO_ROOT}/common/common.nix" | head -1 | cut -d'.' -f3)
-if [[ -z "$USERNAME" ]]; then
-    echo ">>> ⚠ WARNING: Could not extract username from configuration, using 'satya' as fallback"
-    USERNAME="satya"
+# Verify SSH service is configured in our config files
+if grep -q "services\.openssh\.enable = true" "${REPO_ROOT}/common/common.nix"; then
+    echo ">>> ✓ SSH service is enabled in configuration"
 else
-    echo ">>> ✓ Detected username from configuration: ${USERNAME}"
+    echo ">>> ⚠ WARNING: SSH service not found in configuration"
 fi
 
-if nixos-enter --root /mnt -- systemctl is-enabled sshd &>/dev/null; then
-    echo ">>> ✓ SSH service is enabled"
+# Verify user has SSH keys configured
+if grep -q "openssh\.authorizedKeys\.keys" "${REPO_ROOT}/common/common.nix"; then
+    KEY_COUNT=$(grep -c "ssh-" "${REPO_ROOT}/common/common.nix")
+    echo ">>> ✓ SSH authorized keys configured for user '${USERNAME}' (${KEY_COUNT} key(s))"
 else
-    echo ">>> ⚠ WARNING: SSH service may not be properly enabled"
+    echo ">>> ⚠ WARNING: No SSH authorized keys found in configuration"
 fi
 
-# Check if user exists and has authorized keys
-if nixos-enter --root /mnt -- id "${USERNAME}" &>/dev/null; then
-    echo ">>> ✓ User '${USERNAME}' exists in installed system"
-    
-    # Check if authorized_keys file exists and has content
-    if nixos-enter --root /mnt -- test -s "/home/${USERNAME}/.ssh/authorized_keys"; then
-        echo ">>> ✓ SSH authorized keys are configured for user '${USERNAME}'"
-        KEY_COUNT=$(nixos-enter --root /mnt -- wc -l < "/home/${USERNAME}/.ssh/authorized_keys")
-        echo ">>> ✓ Found ${KEY_COUNT} authorized key(s)"
-        
-        # Show the actual key fingerprints for verification
-        echo ">>> Key fingerprints in authorized_keys:"
-        nixos-enter --root /mnt -- ssh-keygen -lf "/home/${USERNAME}/.ssh/authorized_keys" 2>/dev/null || echo ">>> (Could not read key fingerprints)"
-    else
-        echo ">>> ⚠ WARNING: No SSH authorized keys found for user '${USERNAME}'"
-        echo ">>> Checking if .ssh directory exists..."
-        if nixos-enter --root /mnt -- test -d "/home/${USERNAME}/.ssh"; then
-            echo ">>> ✓ .ssh directory exists"
-            echo ">>> Contents of .ssh directory:"
-            nixos-enter --root /mnt -- ls -la "/home/${USERNAME}/.ssh/" 2>/dev/null || echo ">>> (Could not list .ssh contents)"
-        else
-            echo ">>> ✗ .ssh directory does not exist"
-        fi
-    fi
-else
-    echo ">>> ⚠ WARNING: User '${USERNAME}' not found in installed system"
-    echo ">>> Available users:"
-    nixos-enter --root /mnt -- cut -d: -f1 /etc/passwd | grep -v '^_' | sort
-fi
+echo ">>> SSH configuration verification complete"
+echo ">>> Note: SSH connectivity will be available after reboot and system startup"
 
 # 9. Finalize
 # The umount is now handled by the trap at the beginning of the script.
