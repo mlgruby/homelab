@@ -69,11 +69,28 @@ sgdisk -n 1:0:0 -t 1:8300 -c 1:"data" \
 
 # 3. Format the partitions
 echo ">>> Formatting partitions"
-# It's good practice to wait a moment for the kernel to recognize new partitions
+
+# Force kernel to re-read partition tables to prevent errors
+partprobe "${OS_DEVICE}"
+partprobe "${FAST_DEVICE}"
 sleep 2 
-mkfs.fat -F 32 -n boot "${OS_DEVICE}p1"
-mkfs.ext4 -L root "${OS_DEVICE}p2"
-mkfs.ext4 -L data "${FAST_DEVICE}p1"
+
+# Determine partition naming convention (e.g., sda1 vs nvme0n1p1)
+OS_P1="${OS_DEVICE}1"
+OS_P2="${OS_DEVICE}2"
+if [[ "${OS_DEVICE}" == *"nvme"* ]] || [[ "${OS_DEVICE}" == *"mmcblk"* ]]; then
+    OS_P1="${OS_DEVICE}p1"
+    OS_P2="${OS_DEVICE}p2"
+fi
+
+FAST_P1="${FAST_DEVICE}1"
+if [[ "${FAST_DEVICE}" == *"nvme"* ]] || [[ "${FAST_DEVICE}" == *"mmcblk"* ]]; then
+    FAST_P1="${FAST_DEVICE}p1"
+fi
+
+mkfs.fat -F 32 -n boot "${OS_P1}"
+mkfs.ext4 -L root "${OS_P2}"
+mkfs.ext4 -L data "${FAST_P1}"
 
 # 4. Mount the filesystems
 echo ">>> Mounting filesystems"
