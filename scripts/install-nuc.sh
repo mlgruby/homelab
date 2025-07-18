@@ -291,11 +291,11 @@ fi
 
 # Copy our configuration files to the installed system
 echo ">>> Copying configuration files to installed system"
-mkdir -p /mnt/etc/nixos/homelab/common
-mkdir -p /mnt/etc/nixos/homelab/hosts/${HOSTNAME}
+mkdir -p "/mnt/etc/nixos/homelab/common"
+mkdir -p "/mnt/etc/nixos/homelab/hosts/${HOSTNAME}"
 
-cp "${REPO_ROOT}/common/common.nix" /mnt/etc/nixos/homelab/common/
-cp "${REPO_ROOT}/hosts/${HOSTNAME}/configuration.nix" /mnt/etc/nixos/homelab/hosts/${HOSTNAME}/
+cp "${REPO_ROOT}/common/common.nix" "/mnt/etc/nixos/homelab/common/"
+cp "${REPO_ROOT}/hosts/${HOSTNAME}/configuration.nix" "/mnt/etc/nixos/homelab/hosts/${HOSTNAME}/"
 
 # Replace the generated configuration with one that points to our copied files
 rm /mnt/etc/nixos/configuration.nix
@@ -324,7 +324,7 @@ else
 fi
 
 # Check if our copied configurations exist in the installed system
-if [[ -f /mnt/etc/nixos/homelab/hosts/${HOSTNAME}/configuration.nix ]]; then
+if [[ -f "/mnt/etc/nixos/homelab/hosts/${HOSTNAME}/configuration.nix" ]]; then
     echo ">>> ✓ Host-specific configuration copied: /etc/nixos/homelab/hosts/${HOSTNAME}/configuration.nix"
 else
     echo ">>> ✗ ERROR: Host-specific configuration not copied properly"
@@ -339,7 +339,11 @@ else
     exit 1
 fi
 
-# 6.3. Validate NixOS configuration syntax
+# 7. Install NixOS
+echo ">>> Installing NixOS"
+nixos-install --no-root-passwd
+
+# 7.1. Validate NixOS configuration syntax
 echo ">>> Validating NixOS configuration syntax"
 if nixos-enter --root /mnt -- nixos-rebuild dry-run --fast &>/dev/null; then
     echo ">>> ✓ NixOS configuration syntax is valid"
@@ -349,11 +353,7 @@ else
     nixos-enter --root /mnt -- nixos-rebuild dry-run --fast 2>&1 | head -20
 fi
 
-# 7. Install NixOS
-echo ">>> Installing NixOS"
-nixos-install --no-root-passwd
-
-# 7.1. Apply configuration to ensure user and SSH keys are created
+# 7.2. Apply configuration to ensure user and SSH keys are created
 echo ">>> Applying configuration to ensure user and SSH setup"
 if nixos-enter --root /mnt -- nixos-rebuild switch &>/dev/null; then
     echo ">>> ✓ Configuration applied successfully"
