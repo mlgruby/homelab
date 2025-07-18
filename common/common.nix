@@ -14,7 +14,7 @@
   services.openssh.settings.PermitRootLogin = "no";
 
   # Define your user account.
-  users.users.satyasheel = {
+  users.users.satya = {
     isNormalUser = true;
     extraGroups = [ "wheel" ]; # Enable 'sudo'
     openssh.authorizedKeys.keys = [
