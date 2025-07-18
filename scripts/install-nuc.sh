@@ -50,14 +50,22 @@ fi
 
 echo ">>> Starting NUC installation for hostname: ${HOSTNAME}"
 
-# 0. Ensure devices are unmounted and clean
+# 0. Deactivate any existing LVM, RAID, or ZFS to release device locks
+echo ">>> Deactivating LVM, stopping RAID, and clearing ZFS labels..."
+(vgchange -an) 2>/dev/null || true
+(mdadm --stop --scan) 2>/dev/null || true
+# The following command is critical for disks previously used with ZFS (e.g., Proxmox)
+(zpool labelclear -f "${OS_DEVICE}") 2>/dev/null || true
+(zpool labelclear -f "${FAST_DEVICE}") 2>/dev/null || true
+
+# 1. Ensure devices are unmounted and clean
 echo ">>> Wiping existing signatures from disks..."
-umount -R "${OS_DEVICE}" || true
-umount -R "${FAST_DEVICE}" || true
+umount -R "${OS_DEVICE}" 2>/dev/null || true
+umount -R "${FAST_DEVICE}" 2>/dev/null || true
 wipefs --all "${OS_DEVICE}"
 wipefs --all "${FAST_DEVICE}"
 
-# 1. Partition the OS drive
+# 2. Partition the OS drive
 echo ">>> Partitioning OS drive: ${OS_DEVICE}"
 # Wipe the partition table
 sgdisk -Z "${OS_DEVICE}"
@@ -66,7 +74,7 @@ sgdisk -n 1:0:+1G -t 1:ef00 -c 1:"boot" \
        -n 2:0:0   -t 2:8300 -c 2:"root" \
        "${OS_DEVICE}"
 
-# 2. Partition the fast storage drive
+# 3. Partition the fast storage drive
 echo ">>> Partitioning fast storage drive: ${FAST_DEVICE}"
 # Wipe the partition table
 sgdisk -Z "${FAST_DEVICE}"
@@ -74,7 +82,7 @@ sgdisk -Z "${FAST_DEVICE}"
 sgdisk -n 1:0:0 -t 1:8300 -c 1:"data" \
        "${FAST_DEVICE}"
 
-# 3. Format the partitions
+# 4. Format the partitions
 echo ">>> Formatting partitions"
 
 # Force kernel to re-read partition tables to prevent errors
@@ -110,7 +118,7 @@ mkfs.ext4 -L root "${OS_P2}"
 echo ">>> Formatting data partition: ${FAST_P1}"
 mkfs.ext4 -L data "${FAST_P1}"
 
-# 4. Mount the filesystems
+# 5. Mount the filesystems
 echo ">>> Mounting filesystems"
 mount /dev/disk/by-label/root /mnt
 mkdir -p /mnt/boot
@@ -118,7 +126,7 @@ mount /dev/disk/by-label/boot /mnt/boot
 mkdir -p /mnt/data
 mount /dev/disk/by-label/data /mnt/data
 
-# 5. Generate NixOS configuration
+# 6. Generate NixOS configuration
 echo ">>> Generating NixOS configuration"
 nixos-generate-config --root /mnt
 
@@ -140,11 +148,11 @@ cat > /mnt/etc/nixos/configuration.nix <<EOF
 }
 EOF
 
-# 6. Install NixOS
+# 7. Install NixOS
 echo ">>> Installing NixOS"
 nixos-install --no-root-passwd
 
-# 7. Finalize
+# 8. Finalize
 echo ">>> Unmounting filesystems"
 umount -R /mnt
 
