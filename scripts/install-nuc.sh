@@ -80,6 +80,26 @@ echo ">>> Stopping RAID and clearing ZFS labels..."
 (zpool labelclear -f "${FAST_DEVICE}") 2>/dev/null || true
 sleep 2 # Give the system a moment to release locks
 
+# 0.1. Verify devices are accessible
+echo ">>> Verifying device accessibility"
+if [[ -b "${OS_DEVICE}" ]]; then
+    echo ">>> ✓ OS device accessible: ${OS_DEVICE}"
+    echo ">>>   Size: $(lsblk -dno SIZE "${OS_DEVICE}")"
+    echo ">>>   Model: $(lsblk -dno MODEL "${OS_DEVICE}" 2>/dev/null || echo "Unknown")"
+else
+    echo ">>> ✗ ERROR: OS device not accessible: ${OS_DEVICE}"
+    exit 1
+fi
+
+if [[ -b "${FAST_DEVICE}" ]]; then
+    echo ">>> ✓ Fast storage device accessible: ${FAST_DEVICE}"
+    echo ">>>   Size: $(lsblk -dno SIZE "${FAST_DEVICE}")"
+    echo ">>>   Model: $(lsblk -dno MODEL "${FAST_DEVICE}" 2>/dev/null || echo "Unknown")"
+else
+    echo ">>> ✗ ERROR: Fast storage device not accessible: ${FAST_DEVICE}"
+    exit 1
+fi
+
 # 1. Ensure devices are unmounted and clean
 echo ">>> Wiping existing signatures from disks..."
 umount -R "${OS_DEVICE}" 2>/dev/null || true
@@ -96,6 +116,22 @@ sgdisk -n 1:0:+1G -t 1:ef00 -c 1:"boot" \
        -n 2:0:0   -t 2:8300 -c 2:"root" \
        "${OS_DEVICE}"
 
+# 2.1. Verify OS drive partitioning
+echo ">>> Verifying OS drive partitioning"
+if sgdisk -p "${OS_DEVICE}" | grep -q "boot"; then
+    echo ">>> ✓ Boot partition created successfully"
+else
+    echo ">>> ✗ ERROR: Boot partition not found"
+    exit 1
+fi
+
+if sgdisk -p "${OS_DEVICE}" | grep -q "root"; then
+    echo ">>> ✓ Root partition created successfully" 
+else
+    echo ">>> ✗ ERROR: Root partition not found"
+    exit 1
+fi
+
 # 3. Partition the fast storage drive
 echo ">>> Partitioning fast storage drive: ${FAST_DEVICE}"
 # Wipe the partition table
@@ -103,6 +139,15 @@ sgdisk -Z "${FAST_DEVICE}"
 # Create a single partition for data
 sgdisk -n 1:0:0 -t 1:8300 -c 1:"data" \
        "${FAST_DEVICE}"
+
+# 3.1. Verify fast storage drive partitioning
+echo ">>> Verifying fast storage drive partitioning"
+if sgdisk -p "${FAST_DEVICE}" | grep -q "data"; then
+    echo ">>> ✓ Data partition created successfully"
+else
+    echo ">>> ✗ ERROR: Data partition not found"
+    exit 1
+fi
 
 # 4. Format the partitions
 echo ">>> Formatting partitions"
@@ -148,11 +193,111 @@ mount /dev/disk/by-label/boot /mnt/boot
 mkdir -p /mnt/data
 mount /dev/disk/by-label/data /mnt/data
 
+# 5.1. Verify partitions and mounts
+echo ">>> Verifying partition setup"
+
+# Check that all expected partitions exist
+if [[ -e "${OS_P1}" && -e "${OS_P2}" && -e "${FAST_P1}" ]]; then
+    echo ">>> ✓ All partitions created successfully"
+    echo ">>>   Boot: ${OS_P1}"
+    echo ">>>   Root: ${OS_P2}" 
+    echo ">>>   Data: ${FAST_P1}"
+else
+    echo ">>> ✗ ERROR: Some partitions are missing!"
+    echo ">>>   Boot: ${OS_P1} $(test -e "${OS_P1}" && echo "✓" || echo "✗")"
+    echo ">>>   Root: ${OS_P2} $(test -e "${OS_P2}" && echo "✓" || echo "✗")"
+    echo ">>>   Data: ${FAST_P1} $(test -e "${FAST_P1}" && echo "✓" || echo "✗")"
+    exit 1
+fi
+
+# Verify filesystems were formatted correctly
+echo ">>> Verifying filesystem formats"
+BOOT_FS=$(lsblk -no FSTYPE "${OS_P1}")
+ROOT_FS=$(lsblk -no FSTYPE "${OS_P2}")
+DATA_FS=$(lsblk -no FSTYPE "${FAST_P1}")
+
+if [[ "$BOOT_FS" == "vfat" ]]; then
+    echo ">>> ✓ Boot partition formatted as FAT32"
+else
+    echo ">>> ✗ ERROR: Boot partition has wrong filesystem: $BOOT_FS (expected vfat)"
+    exit 1
+fi
+
+if [[ "$ROOT_FS" == "ext4" ]]; then
+    echo ">>> ✓ Root partition formatted as ext4"
+else
+    echo ">>> ✗ ERROR: Root partition has wrong filesystem: $ROOT_FS (expected ext4)"
+    exit 1
+fi
+
+if [[ "$DATA_FS" == "ext4" ]]; then
+    echo ">>> ✓ Data partition formatted as ext4"
+else
+    echo ">>> ✗ ERROR: Data partition has wrong filesystem: $DATA_FS (expected ext4)"
+    exit 1
+fi
+
+# Verify all filesystems are mounted
+echo ">>> Verifying filesystem mounts"
+if mountpoint -q /mnt; then
+    echo ">>> ✓ Root filesystem mounted at /mnt"
+else
+    echo ">>> ✗ ERROR: Root filesystem not mounted"
+    exit 1
+fi
+
+if mountpoint -q /mnt/boot; then
+    echo ">>> ✓ Boot filesystem mounted at /mnt/boot"
+else
+    echo ">>> ✗ ERROR: Boot filesystem not mounted"
+    exit 1
+fi
+
+if mountpoint -q /mnt/data; then
+    echo ">>> ✓ Data filesystem mounted at /mnt/data"
+else
+    echo ">>> ✗ ERROR: Data filesystem not mounted"
+    exit 1
+fi
+
+# Show disk usage
+echo ">>> Filesystem usage:"
+df -h /mnt /mnt/boot /mnt/data
+
 # 6. Generate NixOS configuration
 echo ">>> Generating NixOS configuration"
 nixos-generate-config --root /mnt
 
-# Replace the generated configuration with one that points to our flake
+# 6.1. Verify hardware configuration was generated
+echo ">>> Verifying hardware configuration generation"
+if [[ -f /mnt/etc/nixos/hardware-configuration.nix ]]; then
+    echo ">>> ✓ Hardware configuration generated successfully"
+    # Check if it contains expected filesystem entries
+    if grep -q "boot\.loader" /mnt/etc/nixos/hardware-configuration.nix; then
+        echo ">>> ✓ Hardware config contains boot loader settings"
+    else
+        echo ">>> ⚠ WARNING: Hardware config may be incomplete (no boot loader settings)"
+    fi
+    if grep -q "fileSystems" /mnt/etc/nixos/hardware-configuration.nix; then
+        echo ">>> ✓ Hardware config contains filesystem definitions"
+    else
+        echo ">>> ✗ ERROR: Hardware config missing filesystem definitions"
+        exit 1
+    fi
+else
+    echo ">>> ✗ ERROR: Hardware configuration not generated"
+    exit 1
+fi
+
+# Copy our configuration files to the installed system
+echo ">>> Copying configuration files to installed system"
+mkdir -p /mnt/etc/nixos/homelab/common
+mkdir -p /mnt/etc/nixos/homelab/hosts/${HOSTNAME}
+
+cp "${REPO_ROOT}/common/common.nix" /mnt/etc/nixos/homelab/common/
+cp "${REPO_ROOT}/hosts/${HOSTNAME}/configuration.nix" /mnt/etc/nixos/homelab/hosts/${HOSTNAME}/
+
+# Replace the generated configuration with one that points to our copied files
 rm /mnt/etc/nixos/configuration.nix
 cat > /mnt/etc/nixos/configuration.nix <<EOF
 { ... }:
@@ -163,18 +308,72 @@ cat > /mnt/etc/nixos/configuration.nix <<EOF
       # This pulls in the hardware-specific configuration
       ./hardware-configuration.nix
 
-      # This points to the host-specific configuration in our flake
-      ${REPO_ROOT}/hosts/${HOSTNAME}/configuration.nix
+      # This points to the host-specific configuration
+      ./homelab/hosts/${HOSTNAME}/configuration.nix
     ];
 }
 EOF
+
+# 6.2. Verify our configuration files exist and are accessible
+echo ">>> Verifying configuration file setup"
+if [[ -f /mnt/etc/nixos/configuration.nix ]]; then
+    echo ">>> ✓ Main configuration.nix created successfully"
+else
+    echo ">>> ✗ ERROR: Failed to create configuration.nix"
+    exit 1
+fi
+
+# Check if our copied configurations exist in the installed system
+if [[ -f /mnt/etc/nixos/homelab/hosts/${HOSTNAME}/configuration.nix ]]; then
+    echo ">>> ✓ Host-specific configuration copied: /etc/nixos/homelab/hosts/${HOSTNAME}/configuration.nix"
+else
+    echo ">>> ✗ ERROR: Host-specific configuration not copied properly"
+    exit 1
+fi
+
+# Check if common configuration exists in the installed system
+if [[ -f /mnt/etc/nixos/homelab/common/common.nix ]]; then
+    echo ">>> ✓ Common configuration copied: /etc/nixos/homelab/common/common.nix"
+else
+    echo ">>> ✗ ERROR: Common configuration not copied properly"
+    exit 1
+fi
+
+# 6.3. Validate NixOS configuration syntax
+echo ">>> Validating NixOS configuration syntax"
+if nixos-enter --root /mnt -- nixos-rebuild dry-run --fast &>/dev/null; then
+    echo ">>> ✓ NixOS configuration syntax is valid"
+else
+    echo ">>> ⚠ WARNING: NixOS configuration may have syntax errors"
+    echo ">>> Running syntax check with verbose output:"
+    nixos-enter --root /mnt -- nixos-rebuild dry-run --fast 2>&1 | head -20
+fi
 
 # 7. Install NixOS
 echo ">>> Installing NixOS"
 nixos-install --no-root-passwd
 
+# 7.1. Apply configuration to ensure user and SSH keys are created
+echo ">>> Applying configuration to ensure user and SSH setup"
+if nixos-enter --root /mnt -- nixos-rebuild switch &>/dev/null; then
+    echo ">>> ✓ Configuration applied successfully"
+else
+    echo ">>> ⚠ WARNING: Configuration rebuild had issues, continuing with verification..."
+    nixos-enter --root /mnt -- nixos-rebuild switch 2>&1 | head -10
+fi
+
 # 8. Verify SSH configuration
 echo ">>> Verifying SSH configuration in installed system"
+
+# Extract username from the configuration
+USERNAME=$(grep -o 'users\.users\.[a-zA-Z0-9_-]*' "${REPO_ROOT}/common/common.nix" | head -1 | cut -d'.' -f3)
+if [[ -z "$USERNAME" ]]; then
+    echo ">>> ⚠ WARNING: Could not extract username from configuration, using 'satya' as fallback"
+    USERNAME="satya"
+else
+    echo ">>> ✓ Detected username from configuration: ${USERNAME}"
+fi
+
 if nixos-enter --root /mnt -- systemctl is-enabled sshd &>/dev/null; then
     echo ">>> ✓ SSH service is enabled"
 else
@@ -182,19 +381,33 @@ else
 fi
 
 # Check if user exists and has authorized keys
-if nixos-enter --root /mnt -- id satya &>/dev/null; then
-    echo ">>> ✓ User 'satya' exists in installed system"
+if nixos-enter --root /mnt -- id "${USERNAME}" &>/dev/null; then
+    echo ">>> ✓ User '${USERNAME}' exists in installed system"
     
     # Check if authorized_keys file exists and has content
-    if nixos-enter --root /mnt -- test -s /home/satya/.ssh/authorized_keys; then
-        echo ">>> ✓ SSH authorized keys are configured for user 'satya'"
-        KEY_COUNT=$(nixos-enter --root /mnt -- wc -l < /home/satya/.ssh/authorized_keys)
+    if nixos-enter --root /mnt -- test -s "/home/${USERNAME}/.ssh/authorized_keys"; then
+        echo ">>> ✓ SSH authorized keys are configured for user '${USERNAME}'"
+        KEY_COUNT=$(nixos-enter --root /mnt -- wc -l < "/home/${USERNAME}/.ssh/authorized_keys")
         echo ">>> ✓ Found ${KEY_COUNT} authorized key(s)"
+        
+        # Show the actual key fingerprints for verification
+        echo ">>> Key fingerprints in authorized_keys:"
+        nixos-enter --root /mnt -- ssh-keygen -lf "/home/${USERNAME}/.ssh/authorized_keys" 2>/dev/null || echo ">>> (Could not read key fingerprints)"
     else
-        echo ">>> ⚠ WARNING: No SSH authorized keys found for user 'satya'"
+        echo ">>> ⚠ WARNING: No SSH authorized keys found for user '${USERNAME}'"
+        echo ">>> Checking if .ssh directory exists..."
+        if nixos-enter --root /mnt -- test -d "/home/${USERNAME}/.ssh"; then
+            echo ">>> ✓ .ssh directory exists"
+            echo ">>> Contents of .ssh directory:"
+            nixos-enter --root /mnt -- ls -la "/home/${USERNAME}/.ssh/" 2>/dev/null || echo ">>> (Could not list .ssh contents)"
+        else
+            echo ">>> ✗ .ssh directory does not exist"
+        fi
     fi
 else
-    echo ">>> ⚠ WARNING: User 'satya' not found in installed system"
+    echo ">>> ⚠ WARNING: User '${USERNAME}' not found in installed system"
+    echo ">>> Available users:"
+    nixos-enter --root /mnt -- cut -d: -f1 /etc/passwd | grep -v '^_' | sort
 fi
 
 # 9. Finalize
@@ -216,7 +429,7 @@ echo ">>> 2. Reboot the system"
 echo ">>> 3. The system will boot into NixOS and be accessible via SSH"
 echo ">>> "
 echo ">>> SSH connection command:"
-echo ">>> ssh -i ~/.ssh/nuc_homelab_id_ed25519 satya@${CURRENT_IP}"
+echo ">>> ssh -i ~/.ssh/nuc_homelab_id_ed25519 ${USERNAME}@${CURRENT_IP}"
 echo ">>> "
 echo ">>> Note: If the IP address changes after reboot (DHCP), you can find it by:"
 echo ">>> - Checking your router's admin panel for connected devices"
