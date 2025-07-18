@@ -4,6 +4,7 @@
   imports = [
     ./hardware-configuration.nix
     ../../common/common.nix
+    ../../common/deploy-rs.nix  # Import deploy-rs specific settings
   ];
 
   networking.hostName = "nuc2";
