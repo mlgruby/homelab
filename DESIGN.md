@@ -93,7 +93,7 @@ The TrueNAS will serve as the primary, centralized data store.
   for Kubernetes. iSCSI is not required.
 - **Usage:** This NFS share will provide persistent volumes for the majority of
   applications that do not require extreme IOPS.
-
+3
 ## 6. Configuration & Deployment
 
 - **Source of Truth:** A single Git repository will contain all NixOS
