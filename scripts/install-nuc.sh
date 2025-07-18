@@ -64,10 +64,12 @@ echo ">>> Available block devices:"
 lsblk -dno NAME,SIZE,MODEL
 echo ""
 
-read -r -p "Enter the device for the OS drive (e.g., nvme0n1): " OS_DEVICE_NAME
+read -r -p "Enter the device for the OS drive (default: sda): " OS_DEVICE_NAME
+OS_DEVICE_NAME=${OS_DEVICE_NAME:-sda}
 OS_DEVICE="/dev/${OS_DEVICE_NAME}"
 
-read -r -p "Enter the device for the fast data drive (e.g., nvme1n1): " FAST_DEVICE_NAME
+read -r -p "Enter the device for the fast data drive (default: nvme0n1): " FAST_DEVICE_NAME
+FAST_DEVICE_NAME=${FAST_DEVICE_NAME:-nvme0n1}
 FAST_DEVICE="/dev/${FAST_DEVICE_NAME}"
 
 echo "------------------------------------------------------------------"
@@ -96,6 +98,19 @@ echo ">>> Stopping RAID and clearing ZFS labels..."
 # The following command is critical for disks previously used with ZFS (e.g., Proxmox)
 (zpool labelclear -f "${OS_DEVICE}") 2>/dev/null || true
 (zpool labelclear -f "${FAST_DEVICE}") 2>/dev/null || true
+
+# Additional aggressive cleanup for stubborn devices
+echo ">>> Performing additional device cleanup..."
+(swapoff -a) 2>/dev/null || true
+(umount -R "${OS_DEVICE}" "${FAST_DEVICE}") 2>/dev/null || true
+(blockdev --rereadpt "${OS_DEVICE}") 2>/dev/null || true
+(blockdev --rereadpt "${FAST_DEVICE}") 2>/dev/null || true
+
+# Try to clear any remaining filesystem signatures more aggressively
+echo ">>> Attempting aggressive signature clearing..."
+(dd if=/dev/zero of="${OS_DEVICE}" bs=1M count=100) 2>/dev/null || true
+(dd if=/dev/zero of="${FAST_DEVICE}" bs=1M count=100) 2>/dev/null || true
+
 sleep 2 # Give the system a moment to release locks
 
 # 0.1. Verify devices are accessible
