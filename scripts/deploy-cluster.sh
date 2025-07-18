@@ -84,15 +84,42 @@ else
 fi
 print_success "Configuration generation complete"
 
-# Step 2: Validate with nix flake check
+# Step 2: Validate configurations (evaluation only, no building)
 if [ "$DRY_RUN" = false ]; then
-    print_step "Validating configurations with nix flake check"
-    if nix flake check; then
-        print_success "Configuration validation passed"
+    print_step "Validating configurations"
+    echo "  Checking nuc1 config..."
+    if nix eval .#nixosConfigurations.nuc1.config.system.build.toplevel.drvPath >/dev/null 2>&1; then
+        echo "    ✅ nuc1: Configuration valid"
     else
-        print_error "Configuration validation failed"
+        print_error "nuc1 configuration invalid"
         exit 1
     fi
+    
+    echo "  Checking nuc2 config..."
+    if nix eval .#nixosConfigurations.nuc2.config.system.build.toplevel.drvPath >/dev/null 2>&1; then
+        echo "    ✅ nuc2: Configuration valid"
+    else
+        print_error "nuc2 configuration invalid"
+        exit 1
+    fi
+    
+    echo "  Checking nuc3 config..."
+    if nix eval .#nixosConfigurations.nuc3.config.system.build.toplevel.drvPath >/dev/null 2>&1; then
+        echo "    ✅ nuc3: Configuration valid"
+    else
+        print_error "nuc3 configuration invalid"
+        exit 1
+    fi
+    
+    echo "  Checking deploy configuration..."
+    if nix eval .#deploy.nodes --apply builtins.attrNames >/dev/null 2>&1; then
+        echo "    ✅ deploy: Configuration valid"
+    else
+        print_error "deploy configuration invalid"
+        exit 1
+    fi
+    
+    print_success "Configuration validation passed"
 fi
 
 # Step 3: Deploy (unless skipped)

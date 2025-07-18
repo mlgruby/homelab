@@ -348,6 +348,10 @@ cat > /mnt/etc/nixos/configuration.nix <<EOF
   # Set hostname for this installation
   networking.hostName = "${HOSTNAME}";
   
+  # Enable passwordless sudo for wheel group (needed for first deploy-rs deployment)
+  # This will be overridden by deploy-rs configuration later
+  security.sudo.wheelNeedsPassword = false;
+  
   # Basic system version
   system.stateVersion = "24.05";
 }
