@@ -2,7 +2,7 @@
 # This file contains settings required for deploy-rs automation
 # It should only be imported in configurations managed by deploy-rs
 
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
 {
   # Allow root SSH access for deploy-rs (with same key as user)
@@ -11,6 +11,6 @@
   # Allow passwordless sudo for wheel group (required for deploy-rs)
   security.sudo.wheelNeedsPassword = false;
 
-  # Enable root login for deploy-rs
-  services.openssh.settings.PermitRootLogin = "yes";
-} 
+  # Enable root login for deploy-rs (override common.nix setting)
+  services.openssh.settings.PermitRootLogin = lib.mkForce "yes";
+}

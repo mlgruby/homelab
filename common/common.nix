@@ -7,12 +7,11 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   networking.useDHCP = true;
-  networking.firewall.enable = false; # Disable for k3s cluster communication
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
-  services.openssh.settings.PermitRootLogin = "no"; # Safe default for fresh installs
+  services.openssh.settings.PermitRootLogin = "no";
 
   # Define your user account.
   users.users.satya = {
@@ -22,29 +21,6 @@
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEomtxD4A137gFGJG0cMXMidR5wQymAiay5vUS89qkX8 nuc-homelab-key"
     ];
   };
-
-  # Mount the NVMe data drive
-  fileSystems."/data" = {
-    device = "/dev/disk/by-label/data";
-    fsType = "ext4";
-    options = [ "defaults" ];
-  };
-
-  # Ensure data directories exist
-  systemd.tmpfiles.rules = [
-    "d /data/k3s 0755 root root -"
-    "d /data/k8s-volumes 0755 root root -"
-  ];
-
-  # Basic system packages
-  environment.systemPackages = with pkgs; [
-    vim
-    git
-    curl
-    wget
-    htop
-    iptables
-  ];
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

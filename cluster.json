@@ -1,0 +1,47 @@
+{
+  "domain": "homelab.local",
+  "subnet": "192.168.1.0/24",
+  "nodes": [
+    {
+      "name": "nuc1",
+      "hostname": "nuc1",
+      "ip": "192.168.1.141",
+      "role": "server",
+      "description": "k3s control plane"
+    },
+    {
+      "name": "nuc2",
+      "hostname": "nuc2",
+      "ip": "192.168.1.142",
+      "role": "agent",
+      "description": "k3s worker node"
+    },
+    {
+      "name": "nuc3",
+      "hostname": "nuc3",
+      "ip": "192.168.1.143",
+      "role": "agent",
+      "description": "k3s worker node"
+    }
+  ],
+  "server_config": {
+    "k3s": {
+      "clusterInit": true,
+      "extraFlags": [
+        "--data-dir=/data/k3s",
+        "--default-local-storage-path=/data/k8s-volumes",
+        "--disable=traefik",
+        "--flannel-backend=vxlan"
+      ]
+    }
+  },
+  "agent_config": {
+    "k3s": {
+      "tokenFile": "/etc/rancher/k3s/agent-token",
+      "extraFlags": [
+        "--data-dir=/data/k3s",
+        "--default-local-storage-path=/data/k8s-volumes"
+      ]
+    }
+  }
+} 

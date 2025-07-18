@@ -14,14 +14,12 @@
           ./hosts/nuc1/configuration.nix
         ];
       };
-      
       nuc2 = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [
           ./hosts/nuc2/configuration.nix
         ];
       };
-      
       nuc3 = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [
@@ -39,7 +37,6 @@
           path = deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations.nuc1;
         };
       };
-      
       nuc2 = {
         hostname = "192.168.1.142";
         sshUser = "satya";
@@ -48,7 +45,6 @@
           path = deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations.nuc2;
         };
       };
-      
       nuc3 = {
         hostname = "192.168.1.143";
         sshUser = "satya";

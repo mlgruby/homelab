@@ -4,7 +4,8 @@
   imports = [
     ./hardware-configuration.nix
     ../../common/common.nix
-    ../../common/deploy-rs.nix  # Import deploy-rs specific settings
+    ../../common/k3s-cluster.nix  # Import k3s cluster settings
+    ../../common/deploy-rs.nix    # Import deploy-rs specific settings
   ];
 
   networking.hostName = "nuc1";
@@ -13,16 +14,16 @@
   services.k3s = {
     enable = true;
     role = "server";
-    clusterInit = true; # Initialize a new cluster using embedded etcd
+    clusterInit = true;
     extraFlags = toString [
-      "--data-dir=/data/k3s" # Use NVMe for k3s data
-      "--default-local-storage-path=/data/k8s-volumes" # Use NVMe for local storage
-      "--disable=traefik" # We'll configure ingress separately
-      "--flannel-backend=vxlan" # Use VXLAN for networking
+      "--data-dir=/data/k3s"
+      "--default-local-storage-path=/data/k8s-volumes"
+      "--disable=traefik"
+      "--flannel-backend=vxlan"
     ];
   };
 
-  # Open k3s ports in firewall (even though we disabled it globally)
+  # Open k3s ports in firewall
   networking.firewall = {
     allowedTCPPorts = [
       6443 # Kubernetes API server
