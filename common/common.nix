@@ -23,6 +23,9 @@
     ];
   };
 
+  # Allow passwordless sudo for wheel group (required for deploy-rs)
+  security.sudo.wheelNeedsPassword = false;
+
   # Allow root SSH access for deploy-rs (with same key)
   users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEomtxD4A137gFGJG0cMXMidR5wQymAiay5vUS89qkX8 nuc-homelab-key"
